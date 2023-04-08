@@ -19,7 +19,7 @@ def callback(point_cloud):
     points[:,2]=pc['z']
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(np.array(points, dtype=np.float32))
-    o3d.io.write_point_cloud("/work_space/lidar_data/" + dt_now_str + ".pcd", pcd)
+    o3d.io.write_point_cloud("/work_space/lidar_data/data/" + dt_now_str + ".pcd", pcd)
     print(1)
 
 if __name__ == '__main__':

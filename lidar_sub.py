@@ -20,7 +20,7 @@ def put_dummy_on_cuda():
     device = o3d.core.Device("CUDA:0")
     dtype = o3d.core.float32
     pcd = o3d.t.geometry.PointCloud(device)
-    pcd.point.positions = o3d.core.Tensor(np.empty((300000, 3)), dtype, device)
+    pcd.point.positions = o3d.core.Tensor(np.empty((1, 3)), dtype, device)
     print("************************************************")
     print("put_dummy_on_cuda: ", time.time() - ut)
     print("************************************************")
@@ -74,19 +74,19 @@ def callback(point_cloud, code):
 
 def connect_ros():
     rospy.init_node('lidar_subscriber', anonymous=True)
-    rospy.Subscriber("/livox/lidar_3GGDJ5K00100941", PointCloud2, callback, callback_args="3GGDJ5K00100941")
-    rospy.Subscriber("/livox/lidar_3GGDJ9H00100911", PointCloud2, callback, callback_args="3GGDJ9H00100911")
-    rospy.Subscriber("/livox/lidar_3GGDJ9K00100711", PointCloud2, callback, callback_args="3GGDJ9K00100711")
+    rospy.Subscriber("/livox/lidar_3JEDKBS001G9601", PointCloud2, callback, callback_args="3JEDKBS001G9601")
+    rospy.Subscriber("/livox/lidar_3JEDKC50014U011", PointCloud2, callback, callback_args="3JEDKC50014U011")
+    rospy.Subscriber("/livox/lidar_3JEDL3N0015X621", PointCloud2, callback, callback_args="3JEDL3N0015X621")
     rospy.spin()
 
 def main():
     put_dummy_on_cuda()
-    connect_ros()
-    # set_start_method('fork')
+    # connect_ros()
+    set_start_method('fork')
     # q = Queue()
 
-    # p_connect_ros = Process(target=connect_ros, args=(q,))
-    # p_connect_ros.start()
+    p_connect_ros = Process(target=connect_ros())
+    p_connect_ros.start()
 
     # p_modify_pcd = Process(target=modify_pcd, args=(q,))
     # p_modify_pcd.start()

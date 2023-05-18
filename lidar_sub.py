@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import rospy
-import rospy
 import pcl
 from sensor_msgs.msg import PointCloud2
 import sensor_msgs.point_cloud2 as pc2
@@ -12,46 +11,85 @@ from multiprocessing import set_start_method
 from multiprocessing import Value, Array, Process, Queue
 import multiprocessing
 import time
+import open3d.core as o3c
+import os, glob
+import json
 
-def modify_pcd(q):
-    while 1:
-        dt_now_str = q.get()
-        points = q.get()
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(np.array(points, dtype=np.float32))
-        voxel_pcd = pcd.voxel_down_sample(voxel_size=0.01)
-        o3d.io.write_point_cloud("/work_space/lidar_data/voxel_data/" + dt_now_str + ".pcd", voxel_pcd)
-        print("save voxeld pcd data")
+def put_dummy_on_cuda():
+    ut = time.time()
+    device = o3d.core.Device("CUDA:0")
+    dtype = o3d.core.float32
+    pcd = o3d.t.geometry.PointCloud(device)
+    pcd.point.positions = o3d.core.Tensor(np.empty((300000, 3)), dtype, device)
+    print("************************************************")
+    print("put_dummy_on_cuda: ", time.time() - ut)
+    print("************************************************")
+    
+    
 
-def callback(point_cloud, q):
+
+def callback(point_cloud, code):
+    ut = time.time()
+    
+    # デバイスの設定
+    device = o3d.core.Device("CUDA:0")
+    dtype = o3d.core.float32
+    
+    # 回転行列を含むJSONファイルの読み取り
+    config = {}
+    with open("/work_space/lidar_data/matrix_config/matrix_config.json", mode="r") as f:
+            config = json.load(f)
+    
+    # 計測時の時間を取得
     dt_now = datetime.datetime.now()
     dt_now_str = dt_now.strftime('%Y_%m_%d_%H_%M_%S')
+    
+    # ポイントクラウドオブジュエクトからNumpy配列に変換
     pc = ros_numpy.numpify(point_cloud)
     points=np.zeros((pc.shape[0],3))
     points[:,0]=pc['x']
     points[:,1]=pc['y']
     points[:,2]=pc['z']
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(np.array(points, dtype=np.float32))
-    o3d.io.write_point_cloud("/work_space/lidar_data/data/" + dt_now_str + ".pcd", pcd)
-    print("save pcd data")
-    q.put(dt_now_str)
-    q.put(points)
+    
+    # GPUのメモリにPCDデータを乗せる
+    pcd = o3d.t.geometry.PointCloud(device)
+    pcd.point.positions = o3d.core.Tensor(points, dtype, device)
+    
+    # ボクセル化(1cm)
+    voxel_pcd = pcd.voxel_down_sample(voxel_size=0.01)
+    
+    # 点群データの回転
+    voxel_pcd_rotated = voxel_pcd.transform(np.array(config[code]))
+    print("************************************************")
+    print(code, ": ", time.time() - ut)
+    print("************************************************")
+    
+    
+    for file in glob.glob("/work_space/lidar_data/" + code + "/*.pcd", recursive=True):
+        os.remove(file)
 
-def connect_ros(q):
+    o3d.t.io.write_point_cloud("/work_space/lidar_data/" + code + "/" + dt_now_str + ".pcd", voxel_pcd_rotated)
+    print("save " + code + " data")
+
+
+def connect_ros():
     rospy.init_node('lidar_subscriber', anonymous=True)
-    rospy.Subscriber("/livox/lidar", PointCloud2, callback, callback_args=q)
+    rospy.Subscriber("/livox/lidar_3GGDJ5K00100941", PointCloud2, callback, callback_args="3GGDJ5K00100941")
+    rospy.Subscriber("/livox/lidar_3GGDJ9H00100911", PointCloud2, callback, callback_args="3GGDJ9H00100911")
+    rospy.Subscriber("/livox/lidar_3GGDJ9K00100711", PointCloud2, callback, callback_args="3GGDJ9K00100711")
     rospy.spin()
 
 def main():
-    set_start_method('fork')
-    q = Queue()
+    put_dummy_on_cuda()
+    connect_ros()
+    # set_start_method('fork')
+    # q = Queue()
 
-    p_connect_ros = Process(target=connect_ros, args=(q,))
-    p_connect_ros.start()
+    # p_connect_ros = Process(target=connect_ros, args=(q,))
+    # p_connect_ros.start()
 
-    p_modify_pcd = Process(target=modify_pcd, args=(q,))
-    p_modify_pcd.start()
+    # p_modify_pcd = Process(target=modify_pcd, args=(q,))
+    # p_modify_pcd.start()
 
 
 if __name__ == '__main__':

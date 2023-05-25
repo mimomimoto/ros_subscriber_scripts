@@ -12,7 +12,9 @@ import time
 import open3d.core as o3c
 import os, glob
 import json
-
+from np_socket import SocketNumpyArray
+import struct
+import pickle
 
 def put_dummy_on_cuda():
     ut = time.time()
@@ -59,10 +61,13 @@ def callback(point_cloud, args):
     
     # 点群データの回転
     voxel_pcd_rotated = voxel_pcd.transform(np.array(config[code]))
+    print("************************************************")
+    print(pcd.point)
+    print(code, ": ", time.time() - ut, time.time())
+    print("************************************************")
+    
     q.put(voxel_pcd_rotated)
-    print("************************************************")
-    print(code, ": ", time.time() - ut)
-    print("************************************************")
+    
     
     
     for file in glob.glob("/work_space/lidar_data/" + code + "/*.pcd", recursive=True):
@@ -81,8 +86,11 @@ def connect_ros(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621):
     rospy.spin()
     
 def combine_pcd(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621):
-    print("++++++++++++++++++++++++++++")
+    sock_sender = SocketNumpyArray()
+    sock_sender.initialize_sender('192.168.30.10', 8800)
     while 1:
+        ut = time.time()
+        
         pcd_3JEDKBS001G9601 = q_3JEDKBS001G9601.get()
 
         pcd_3JEDKC50014U011 = q_3JEDKC50014U011.get()
@@ -93,6 +101,17 @@ def combine_pcd(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621):
         combined_pcd = pcd_3JEDKBS001G9601 + pcd_3JEDKC50014U011 + pcd_3JEDL3N0015X621
         
         combined_voxel_pcd = combined_pcd.voxel_down_sample(voxel_size=0.01)
+        
+        print("************************************************")
+        print("combined data: ", time.time() - ut, time.time())
+        print("************************************************")
+
+        combined_voxel_numpy = combined_voxel_pcd.point.positions.cpu().numpy().copy()
+        data = pickle.dumps(combined_voxel_numpy)
+        
+        message_size = struct.pack("I", len(data))
+        sock_sender.socket.sendall(message_size + data)
+        
         
         dt_now = datetime.datetime.now()
         dt_now_str = dt_now.strftime('%Y_%m_%d_%H_%M_%S')

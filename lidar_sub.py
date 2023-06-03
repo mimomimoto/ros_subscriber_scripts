@@ -73,7 +73,7 @@ def callback(point_cloud, args):
     for file in glob.glob("/work_space/lidar_data/" + code + "/*.pcd", recursive=True):
         os.remove(file)
 
-    o3d.t.io.write_point_cloud("/work_space/lidar_data/" + code + "/" + dt_now_str + ".pcd", voxel_pcd_rotated)
+    o3d.t.io.write_point_cloud("/work_space/lidar_data/" + code + "/" + dt_now_str + ".pcd", voxel_pcd)
     print("save " + code + " data")
 
     
@@ -87,7 +87,7 @@ def connect_ros(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621):
     
 def combine_pcd(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621):
     sock_sender = SocketNumpyArray()
-    sock_sender.initialize_sender('192.168.30.10', 8800)
+    sock_sender.initialize_sender('192.168.30.10', 49220)
     while 1:
         ut = time.time()
         

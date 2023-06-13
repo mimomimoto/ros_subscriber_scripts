@@ -73,7 +73,7 @@ def callback(point_cloud, args):
     for file in glob.glob("/work_space/lidar_data/" + code + "/*.pcd", recursive=True):
         os.remove(file)
 
-    o3d.t.io.write_point_cloud("/work_space/lidar_data/" + code + "/" + dt_now_str + ".pcd", voxel_pcd)
+    o3d.t.io.write_point_cloud("/work_space/lidar_data/" + code + "/" + dt_now_str + ".pcd", pcd)
     print("save " + code + " data")
 
     
@@ -89,6 +89,7 @@ def combine_pcd(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621):
     sock_sender = SocketNumpyArray()
     sock_sender.initialize_sender('192.168.30.10', 49220)
     while 1:
+        # try:
         ut = time.time()
         
         pcd_3JEDKBS001G9601 = q_3JEDKBS001G9601.get()
@@ -107,6 +108,7 @@ def combine_pcd(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621):
         print("************************************************")
 
         combined_voxel_numpy = combined_voxel_pcd.point.positions.cpu().numpy().copy()
+        print("time:", time.time())
         data = pickle.dumps(combined_voxel_numpy)
         
         message_size = struct.pack("I", len(data))
@@ -120,7 +122,11 @@ def combine_pcd(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621):
 
         o3d.t.io.write_point_cloud("/work_space/lidar_data/combined_pcd/" + dt_now_str + ".pcd", combined_voxel_pcd)
         print("save combined data")
-    
+        # except:
+        #     sock_sender = SocketNumpyArray()
+        #     sock_sender.initialize_sender('192.168.30.10', 49220)
+        
+        
 
 def main():
     if mp.get_start_method() == 'fork':

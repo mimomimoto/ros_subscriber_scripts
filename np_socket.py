@@ -59,6 +59,7 @@ class SocketNumpyArray():
         self.data = b''
 
     def receive_array(self):
+        
 
         while len(self.data) < self.payload_size:
             self.data += self.conn.recv(4096)
@@ -76,4 +77,5 @@ class SocketNumpyArray():
 
         # Extract frame
         frame = pickle.loads(frame_data)
+        print(time.time)
         return frame

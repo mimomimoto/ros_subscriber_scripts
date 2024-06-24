@@ -16,6 +16,7 @@ from np_socket import SocketNumpyArray
 import struct
 import pickle
 import csv
+import os
 import sys
 
 def put_dummy_on_cuda():
@@ -138,15 +139,14 @@ def callback(point_cloud, args):
         print('*******************************************************************')
     
     if q.qsize() >= 1:
-        # print('clear que')
+        print('clear que')
         q.get()
     q.put(voxel_pcd_rotated)
     # print('qsize: ', q.qsize())
     
-    # print("************************************************")
-    # print(pcd.point)
-    # print(code, " que: ", time.time() - ut, time.time())
-    # print("************************************************")
+    print("************************************************")
+    print(code, " que: ", time.time() - ut, time.time())
+    print("************************************************")
     
     
     
@@ -157,38 +157,41 @@ def callback(point_cloud, args):
     print("save " + code + " data")
 
     
-def connect_ros(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621):
+def connect_ros(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621, q_3JEDL76001L4201):
     put_dummy_on_cuda()
     rospy.init_node('lidar_subscriber', anonymous=True)
     rospy.Subscriber("/livox/lidar_3JEDKBS001G9601", PointCloud2, callback, ("3JEDKBS001G9601", q_3JEDKBS001G9601))
     rospy.Subscriber("/livox/lidar_3JEDKC50014U011", PointCloud2, callback, ("3JEDKC50014U011", q_3JEDKC50014U011))
     rospy.Subscriber("/livox/lidar_3JEDL3N0015X621", PointCloud2, callback, ("3JEDL3N0015X621", q_3JEDL3N0015X621))
+    rospy.Subscriber("/livox/lidar_3JEDL76001L4201", PointCloud2, callback, ("3JEDL76001L4201", q_3JEDL76001L4201))
     rospy.spin()
     
-def combine_pcd(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621):
+def combine_pcd(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621, q_3JEDL76001L4201):
     global REBOOT_FLAG
     sock_sender = SocketNumpyArray()
     sock_sender.initialize_sender('192.168.50.30', 49220)
     send_data_time =  time.time()
     while 1:
-        # print(time.time() - send_data_time)
-        # if  (time.time() - send_data_time) >= 10:
-        #     print('reboot program')
-        #     sys.exit()
         try:
-        
+            
             pcd_3JEDKBS001G9601 = q_3JEDKBS001G9601.get()
 
             pcd_3JEDKC50014U011 = q_3JEDKC50014U011.get()
 
             pcd_3JEDL3N0015X621 = q_3JEDL3N0015X621.get()
             
+            pcd_3JEDL76001L4201 = q_3JEDL76001L4201.get()
+            
             ut = time.time()
 
 
-            combined_pcd = pcd_3JEDKBS001G9601 + pcd_3JEDKC50014U011 + pcd_3JEDL3N0015X621
+            combined_pcd = pcd_3JEDKBS001G9601 + pcd_3JEDKC50014U011 + pcd_3JEDL3N0015X621 + pcd_3JEDL76001L4201
             
             combined_voxel_pcd = combined_pcd.voxel_down_sample(voxel_size=0.05)
+            
+            now_dt = datetime.datetime.now()
+            if 18 == now_dt.hour and 5 > now_dt.minute and now_dt.minute > 0:
+                o3d.t.io.write_point_cloud("/work_space/lidar_data/base/base.pcd", combined_voxel_pcd)
             
             # print("************************************************")
             # print("combined data: ", time.time() - ut, time.time())
@@ -215,20 +218,24 @@ def combine_pcd(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621):
             message_size = struct.pack("I", len(data))
             sock_sender.socket.sendall(message_size + data)
             send_data_time = time.time()
-            # print("************************************************")
-            # print("send data: ", time.time() - ut, time.time())
-            # print("************************************************")
+            print("************************************************")
+            print("send data: ", time.time() - ut, time.time())
+            print("************************************************")
             ut = time.time()
             
             
             dt_now = datetime.datetime.now()
             dt_now_str = dt_now.strftime('%Y_%m_%d_%H_%M_%S')
-            for file in glob.glob("/work_space/lidar_data/combined_pcd" + "/*.pcd", recursive=True):
-                os.remove(file)
+            # for file in glob.glob("/work_space/lidar_data/combined_pcd" + "/*.pcd", recursive=True):
+            #     os.remove(file)
 
-            o3d.t.io.write_point_cloud("/work_space/lidar_data/combined_pcd/" + dt_now_str + ".pcd", combined_voxel_pcd)
-            # print("save combined data")
+            o3d.t.io.write_point_cloud("/work_space/lidar_data/combined_pcd/combined.pcd", combined_voxel_pcd)
+            
+                
+            # o3d.t.io.write_point_cloud("/work_space/lidar_data/combined_pcd/" + dt_now_str + ".pcd", combined_voxel_pcd)
+            print("save combined data")
         except:
+            
             continue
         
         
@@ -242,11 +249,12 @@ def main():
     q_3JEDKBS001G9601 = manager.Queue()
     q_3JEDKC50014U011 = manager.Queue()
     q_3JEDL3N0015X621 = manager.Queue()
+    q_3JEDL76001L4201 = manager.Queue()
 
-    p_connect_ros = mp.Process(target=connect_ros, args=(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621,))
+    p_connect_ros = mp.Process(target=connect_ros, args=(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621, q_3JEDL76001L4201))
     p_connect_ros.start()
     
-    p_combine_pcd = mp.Process(target=combine_pcd, args=(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621,))
+    p_combine_pcd = mp.Process(target=combine_pcd, args=(q_3JEDKBS001G9601, q_3JEDKC50014U011, q_3JEDL3N0015X621, q_3JEDL76001L4201))
     p_combine_pcd.start()
     
     p_connect_ros.join()
